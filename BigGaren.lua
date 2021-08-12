@@ -5,7 +5,7 @@
 
 
 
-
+-- Check if we are using the right champion
 if Player.CharName ~= "Garen" then
     return false
 end
@@ -48,24 +48,6 @@ local HitChanceStrings = { "Collision", "OutOfRange", "VeryLow", "Low", "Medium"
 
 local LocalPlayer = ObjectManager.Player.AsHero
 
--- Check if we are using the right champion
-
-
-
-
-local flashSpell = nil
--- Check if Player has flash
-if string.find(string.lower(LocalPlayer:GetSpell(SpellSlots.Summoner1).Name), "flash") then
-    flashSpell = SpellSlots.Summoner1
-elseif string.find(string.lower(LocalPlayer:GetSpell(SpellSlots.Summoner2).Name), "flash") then
-    flashSpell = SpellSlots.Summoner2
-end
-
-
-
-
-
-
 
 
 -- Globals
@@ -87,6 +69,31 @@ local UsableSS = {
     }
 }
 
+
+-- Spells
+Garen.Q = SpellLib.Active({
+    Slot = SpellSlots.Q,
+    Range = 300,
+
+})
+Garen.W = SpellLib.Active({
+    Slot = SpellSlots.W,
+
+})
+Garen.E = SpellLib.Active({
+    Slot = SpellSlots.E,
+    Range = 325,
+})
+Garen.R = SpellLib.Targeted({
+    Slot = SpellSlots.R,
+    Range = 400,
+    Delay = 0.435,
+    Type = "Targeted",
+
+
+})
+
+-- Functions
 function CheckIgniteSlot()
     local slots = { Enums.SpellSlots.Summoner1, Enums.SpellSlots.Summoner2 }
 
@@ -109,7 +116,6 @@ function CheckIgniteSlot()
     end
 
 end
-
 function CheckFlashSlot()
     local slots = { Enums.SpellSlots.Summoner1, Enums.SpellSlots.Summoner2 }
 
@@ -132,93 +138,7 @@ function CheckFlashSlot()
     end
 
 end
--- Spells
-Garen.Q = SpellLib.Active({
-    Slot = SpellSlots.Q,
-    Range = 300,
-
-})
-
-Garen.W = SpellLib.Active({
-    Slot = SpellSlots.W,
-
-})
-
-Garen.E = SpellLib.Active({
-    Slot = SpellSlots.E,
-    Range = 325,
-})
-
-Garen.R = SpellLib.Targeted({
-    Slot = SpellSlots.R,
-    Range = 400,
-    Delay = 0.435,
-    Type = "Targeted",
-
-
-})
-
-
--- Utils
-
-
-local CastSpell = function(slot, position, condition)
-    local tick = os_clock()
-    if LastCastT[slot] + 0.1 < tick then
-        if Input.Cast(slot, position) then
-            LastCastT[slot] = tick
-            if condition ~= nil then
-                return true and (type(condition) == "function" and condition() or type(condition) == "boolean" and condition)
-            end
-            return true
-        end
-    end
-    return false
-end
-
-function Utils.GetEBonusRange ()
-
-
-    local ultLevel = Garen.R:GetLevel()
-
-    if ultLevel == 0 then
-        return 0
-    end
-
-    local stacks = Utils.addStackRange()
-
-    local rangeModifier = ({ 4.5, 6, 7.5 })[Garen.R:GetLevel()]
-
-    local rangeAdded = stacks * rangeModifier
-
-    if rangeAdded >= 75 then
-        return 75
-    end
-
-    return rangeAdded
-
-end
-function Utils.addStackRange()
-
-    local buffs = LocalPlayer.Buffs
-
-    for k, v in pairs(buffs) do
-
-        if (v.Name == "Feast") then
-
-
-            return v.Count
-
-        end
-
-
-    end
-
-    return 0
-
-end
-
-function getUltDmg(Target)
+function GetUltDmg(Target)
 
     if not Garen.R:IsLearned() then
         return 0
@@ -239,8 +159,7 @@ function getUltDmg(Target)
     return dmgR + bonusDmg
 
 end
-
-function getIgniteDmg(target)
+function GetIgniteDmg(target)
 
 
     if not UsableSS.Ignite.Slot ~= nil and LocalPlayer:GetSpellState(UsableSS.Ignite.Slot) ==
@@ -251,29 +170,6 @@ function getIgniteDmg(target)
     end
 
     return 0
-
-
-end
-
-function getWDmg(Target)
-
-    if not Garen.W:IsLearned() then
-        return 0
-
-    end
-
-    if not Garen.W:IsReady() then
-        return 0
-
-    end
-
-    local baseDmg = ({ 75, 125, 175, 225, 275 })[Garen.W:GetLevel()]
-
-    local apDmg = LocalPlayer.TotalAP * 0.7
-
-    local totalDmg = baseDmg + apDmg
-
-    return DamageLib.CalculateMagicalDamage(LocalPlayer, Target, totalDmg)
 
 
 end
@@ -311,10 +207,10 @@ function GetEDamage(target)
 
     local amountOfSpins = 7 + extraspins
 
-return ((physicalBaseDamagePerSpin + physicalBonusDamagePerLevel + (LocalPlayer.TotalAD * (adValueBonus / 100)))*amountOfSpins  )*1.25
+    return ((physicalBaseDamagePerSpin + physicalBonusDamagePerLevel + (LocalPlayer.TotalAD * (adValueBonus / 100))) * amountOfSpins) * 1.25
 
 end
-function getQDmg(Target)
+function GetQDmg(Target)
 
     if not Garen.Q:IsLearned() then
         return 0
@@ -336,15 +232,42 @@ function getQDmg(Target)
 
 
 end
+function CanKill(target)
 
-function getUltMinionDmg()
+    if not Menu.Get("Draw.ComboDamage") then
+        return
+    end
 
-    local dmgR = 1000
-    local bonusDmg = LocalPlayer.TotalAP / 2 + LocalPlayer.BonusHealth / 10
+    local damageToDeal = 0
 
-    return dmgR + bonusDmg
+    local useIgnite = false
+
+    if GetIgniteDmg(target) ~= 0 then
+        useIgnite = true
+    end
+
+    local useQ = Garen.Q:IsReady()
+    local useE = false
+    local useR = Garen.R:IsReady() and Menu.Get("Combo.R.Use")
+
+    if useQ then
+
+        damageToDeal = damageToDeal + GetQDmg(target)
+    end
+
+    if useIgnite then
+        damageToDeal = damageToDeal + GetIgniteDmg(target)
+    end
+
+    if useR then
+        damageToDeal = damageToDeal + GetUltDmg(target)
+    end
+
+    return target.Health + target.ShieldAll - damageToDeal <= 0
 
 end
+-- Utils
+
 
 function Utils.IsGameAvailable()
     -- Is game available to automate stuff
@@ -366,7 +289,6 @@ end
 function Utils.IsValidTarget(Target)
     return Target and Target.IsTargetable and Target.IsAlive
 end
-
 function Utils.CountMinionsInRange(range, type)
     local amount = 0
     for k, v in ipairs(ObjectManager.GetNearby(type, "minions")) do
@@ -378,7 +300,6 @@ function Utils.CountMinionsInRange(range, type)
     end
     return amount
 end
-
 function Utils.CountMonstersInRange(range, type)
     local amount = 0
     for k, v in ipairs(ObjectManager.GetNearby(type, "minions")) do
@@ -390,7 +311,6 @@ function Utils.CountMonstersInRange(range, type)
     end
     return amount
 end
-
 function Utils.ValidMinion(minion)
     return minion and minion.IsTargetable and minion.MaxHealth > 6 -- check if not plant or shroom
 end
@@ -419,26 +339,15 @@ function Utils.TargetsInRange(Target, Range, Team, Type, Condition)
     return { Array = Array, Count = Index }
 end
 
-function Garen.Logic.W(Target, Enable, HitChance)
-
-
-end
-function Garen.Logic.Q(Target, Hitchance, Enable, Auto)
-
-
-end
-function Garen.Logic.E(Target, Enable)
-
-end
 function Garen.Logic.R(Target, Enable, EnableFlash)
 
 
-    if Enable and EnableFlash and flashSpell ~= nil and Utils.IsInRange(LocalPlayer.Position, Target.Position, 410, 400 + 375) then
+    if Enable and EnableFlash and UsableSS.Flash.Slot ~= nil and Utils.IsInRange(LocalPlayer.Position, Target.Position, 410, 400 + 375) then
 
 
         if Garen.R:IsReady() and LocalPlayer:GetSpellState(UsableSS.Flash.Slot) == Enums.SpellStates.Ready then
 
-            Input.Cast(flashSpell, Target.Position)
+            Input.Cast(UsableSS.Flash.Slot, Target.Position)
 
         end
 
@@ -449,7 +358,6 @@ function Garen.Logic.R(Target, Enable, EnableFlash)
 
     return false
 end
-
 function Garen.Logic.Waveclear()
 
 
@@ -472,7 +380,7 @@ function Garen.Logic.Waveclear()
 
             local cannonFutureHealth = (HealthPred.GetHealthPrediction(cannon, 0.4))
 
-            if getQDmg(cannon) >= cannonFutureHealth and Utils.IsInRange(LocalPlayer.Position, cannon.Position, 0, 150) then
+            if GetQDmg(cannon) >= cannonFutureHealth and Utils.IsInRange(LocalPlayer.Position, cannon.Position, 0, 150) then
 
                 Orbwalker.Attack(cannon)
                 if garenEState == "GarenECancel" then
@@ -521,14 +429,11 @@ function Garen.Logic.Waveclear()
         return true
     end
 end
-
 function Garen.Logic.Harass()
 
 
 end
-
 function Garen.Logic.Combo()
-
 
 
     local hasQBuff = false
@@ -546,13 +451,13 @@ function Garen.Logic.Combo()
     if Target then
 
 
-        if canKill(Target) and UsableSS.Ignite.Slot ~= nil and getIgniteDmg(Target) ~= 0 then
+        if CanKill(Target) and UsableSS.Ignite.Slot ~= nil and GetIgniteDmg(Target) ~= 0 then
             Input.Cast(UsableSS.Ignite.Slot, Target)
         end
 
         if Garen.R:IsReady() and not Target.HasUndyingBuff and not Target.IsInvulnerable then
 
-            if (Target.Health + Target.ShieldAll - getUltDmg(Target) <= 0) then
+            if (Target.Health + Target.ShieldAll - GetUltDmg(Target) <= 0) then
 
 
                 Garen.Logic.R(Target, Menu.Get("Combo.R.Use"), Menu.Get("Combo.R.Flash.Use"))
@@ -634,7 +539,6 @@ function Garen.Logic.Combo()
     end
 
 end
-
 function Garen.Logic.Flee()
 
     if Garen.Q:IsReady() then
@@ -643,40 +547,6 @@ function Garen.Logic.Flee()
 
 end
 
-function canKill(target)
-
-    if not Menu.Get("Draw.ComboDamage") then
-        return
-    end
-
-    local damageToDeal = 0
-
-    local useIgnite = false
-
-    if getIgniteDmg(target) ~= 0 then
-        useIgnite = true
-    end
-
-    local useQ = Garen.Q:IsReady()
-    local useE = false
-    local useR = Garen.R:IsReady() and Menu.Get("Combo.R.Use")
-
-    if useQ then
-
-        damageToDeal = damageToDeal + getQDmg(target)
-    end
-
-    if useIgnite then
-        damageToDeal = damageToDeal + getIgniteDmg(target)
-    end
-
-    if useR then
-        damageToDeal = damageToDeal + getUltDmg(target)
-    end
-
-    return target.Health + target.ShieldAll - damageToDeal <= 0
-
-end
 
 function Garen.LoadMenu()
     Menu.RegisterMenu("BigGaren", "BigGaren", function()
@@ -730,7 +600,7 @@ function Garen.Logic.Auto()
 
         if target and not target.HasUndyingBuff then
 
-            if target.Health + target.ShieldAll <= getUltDmg(target) and Menu.Get("Auto.R.Hero") then
+            if target.Health + target.ShieldAll <= GetUltDmg(target) and Menu.Get("Auto.R.Hero") then
 
                 TS:ForceTarget(TS, target)
                 Input.Cast(Garen.R.Slot, enemy)
@@ -752,7 +622,7 @@ function Garen.Logic.Auto()
 
 end
 
-CheckIgniteSlot()
+
 
 function Garen.OnDrawDamage(target, dmgList)
 
@@ -761,16 +631,18 @@ function Garen.OnDrawDamage(target, dmgList)
         return
     end
 
-    if Menu.Get("Drawings.Combo.OnlyR") and Garen.R:IsReady() then table.insert(dmgList, getUltDmg(target))
+    if Menu.Get("Drawings.Combo.OnlyR") and Garen.R:IsReady() then
+        table.insert(dmgList, GetUltDmg(target))
         return
-        elseif Menu.Get("Drawings.Combo.OnlyR") and not Garen.R:IsReady() then return 0
+    elseif Menu.Get("Drawings.Combo.OnlyR") and not Garen.R:IsReady() then
+        return 0
     end
 
     local damageToDeal = 0
 
     local useIgnite = false
 
-    if getIgniteDmg(target) ~= 0 then
+    if GetIgniteDmg(target) ~= 0 then
         useIgnite = true
     end
 
@@ -780,7 +652,7 @@ function Garen.OnDrawDamage(target, dmgList)
 
     if useQ then
 
-        damageToDeal = damageToDeal + getQDmg(target)
+        damageToDeal = damageToDeal + GetQDmg(target)
     end
 
     if useE then
@@ -789,16 +661,13 @@ function Garen.OnDrawDamage(target, dmgList)
     end
 
     if useIgnite then
-        damageToDeal = damageToDeal + getIgniteDmg(target)
+        damageToDeal = damageToDeal + GetIgniteDmg(target)
     end
 
     if useR then
 
-        damageToDeal = damageToDeal + getUltDmg(target)
+        damageToDeal = damageToDeal + GetUltDmg(target)
     end
-
-
-
 
     table.insert(dmgList, damageToDeal)
 end
@@ -821,7 +690,6 @@ function Garen.OnDraw()
     if Menu.Get("Drawings.R") then
         Renderer.DrawCircle3D(LocalPlayer.Position, Garen.R.Range, 30, 1, 0xFF31FFFF)
     end
-
 
     return true
 end
