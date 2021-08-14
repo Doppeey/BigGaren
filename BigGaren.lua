@@ -382,18 +382,18 @@ function Garen.Logic.Waveclear()
 
             if GetQDmg(cannon) >= cannonFutureHealth and Utils.IsInRange(LocalPlayer.Position, cannon.Position, 0, 150) then
 
-                Orbwalker.Attack(cannon)
+                Input.Attack(cannon)
                 if garenEState == "GarenECancel" then
 
 
                     print("castin q because cannon about to die!")
                     Input.Cast(SpellSlots.E)
-                    Orbwalker.Attack(cannon)
+                    Input.Attack(cannon)
                     Input.Cast(SpellSlots.Q)
                     return true
                 end
 
-                Orbwalker.Attack(cannon)
+                Input.Attack(cannon)
                 Input.Cast(SpellSlots.Q)
                 print("castin q because cannon about to die!")
                 return true
@@ -528,7 +528,7 @@ function Garen.Logic.Combo()
 
                 return true
             else
-                Orbwalker.Attack(Target)
+                Input.Attack(Target)
                 return true
             end
 
