@@ -161,6 +161,14 @@ function GetUltDmg(Target)
 end
 function GetIgniteDmg(target)
 
+    if UsableSS.Ignite.Slot == nil then
+        return 0
+    end
+
+    if LocalPlayer:GetSpellState(UsableSS.Ignite.Slot) == nil then return 0
+
+    end
+
 
     if not UsableSS.Ignite.Slot ~= nil and LocalPlayer:GetSpellState(UsableSS.Ignite.Slot) ==
             Enums.SpellStates.Ready then
